@@ -1,0 +1,142 @@
+services:
+  medivault-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: medivault-api
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    environment:
+      # Flowise
+      - FLOWISE_ENDPOINT=${FLOWISE_ENDPOINT:-http://medivault-flowise:3001}
+      - FLOWISE_API_KEY=${FLOWISE_API_KEY:-}
+      - SOAP_FLOW_ID=${SOAP_FLOW_ID:-}
+      - QA_FLOW_ID=${QA_FLOW_ID:-}
+      # Ollama — sole LLM provider (fully air-gapped, runs on host for GPU acceleration)
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+      - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      # ChromaDB (Docker service — auto-managed)
+      - CHROMA_HOST=${CHROMA_HOST:-medivault-chromadb}
+      - CHROMA_PORT=${CHROMA_PORT:-8000}
+      # Whisper — Docker service (medivault-whisper) or host fallback
+      - WHISPER_ENDPOINT=${WHISPER_ENDPOINT:-http://host.docker.internal:8080}
+      # Limits
+      - MAX_AUDIO_SIZE=${MAX_AUDIO_SIZE:-52428800}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10485760}
+    networks:
+      - medivault-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - medivault-flowise
+      - medivault-whisper
+      - medivault-chromadb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  medivault-ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: medivault-ui
+    ports:
+      - "3000:8080"
+    depends_on:
+      - medivault-api
+    networks:
+      - medivault-network
+    restart: unless-stopped
+
+  medivault-chromadb:
+    image: chromadb/chroma:latest
+    container_name: medivault-chromadb
+    ports:
+      - "8100:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - medivault-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8000 && echo -e \"GET /api/v2/heartbeat HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && grep -q nanosecond <&3'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  medivault-flowise:
+    image: flowiseai/flowise:latest
+    container_name: medivault-flowise
+    ports:
+      - "3001:3001"
+    volumes:
+      - flowise-data:/root/.flowise
+    environment:
+      - PORT=3001
+    networks:
+      - medivault-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/v1/ping | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  medivault-whisper:
+    # Whisper.cpp-based ASR — 4-8x faster than Python Whisper on CPU.
+    # Same /asr endpoint and request format — zero code changes needed.
+    # Model downloaded automatically on first run to the whisper-models volume.
+    #
+    # GPU (NVIDIA): change tag to :latest-gpu and add nvidia device reservations.
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: medivault-whisper
+    ports:
+      - "9000:9000"
+    volumes:
+      - whisper-models:/root/.cache/whisper
+    environment:
+      # Model size: tiny | base | small | medium | large-v3
+      # Recommended: small (good accuracy, ~460 MB, ~30-45s for 2-min audio on CPU)
+      - ASR_MODEL=${WHISPER_MODEL:-small}
+      - ASR_ENGINE=faster_whisper
+    networks:
+      - medivault-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -w '%{http_code}' http://localhost:9000/docs | grep -q 200 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
+  # ── Host services (NOT in Docker) ──────────────────────────────────────────
+  #
+  # Ollama  :11434  — LLM inference (runs on host for GPU acceleration)
+  #   Install: https://ollama.com/download
+  #   Models:  ollama pull llama3.1:8b && ollama pull nomic-embed-text
+
+networks:
+  medivault-network:
+    driver: bridge
+
+volumes:
+  flowise-data:
+  chroma-data:
+  whisper-models:
+    # Persists downloaded Whisper model across container restarts.
+    # First run downloads ~460 MB (small) to ~3 GB (large-v3).
+    # Subsequent starts are instant.

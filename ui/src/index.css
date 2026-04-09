@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .dark ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .dark ::-webkit-scrollbar-track {
+    background: #0f1629;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #2d3a5e;
+    border-radius: 3px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #A335FC;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border transition-colors duration-200;
+  }
+
+  .dark .card {
+    @apply bg-surface-900 border-slate-700/50;
+  }
+
+  .card {
+    @apply bg-white border-gray-200 shadow-sm;
+  }
+
+  .btn-primary {
+    @apply w-full py-3.5 px-6 rounded-xl font-semibold text-white transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .dark .btn-primary {
+    @apply bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 shadow-glow-purple hover:shadow-glow-cyan disabled:hover:from-purple-600 disabled:hover:to-cyan-600;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .dark .btn-secondary {
+    @apply bg-surface-800 border border-slate-700/50 text-slate-300 hover:border-purple-500/50 hover:text-purple-300;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-100 border border-gray-200 text-gray-700 hover:border-purple-300 hover:text-purple-700;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl font-sans text-sm resize-none focus:outline-none transition-colors duration-200;
+  }
+
+  .dark .input-field {
+    @apply bg-surface-950 text-slate-100 border border-slate-700/50 focus:border-purple-500/50 placeholder-slate-600;
+  }
+
+  .input-field {
+    @apply bg-gray-50 text-gray-900 border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 placeholder-gray-400;
+  }
+
+  .tab-btn {
+    @apply px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200;
+  }
+
+  .dark .tab-btn-active {
+    @apply bg-purple-600/20 text-purple-300 border border-purple-500/40;
+  }
+
+  .dark .tab-btn-inactive {
+    @apply text-slate-400 hover:text-slate-200 border border-transparent hover:border-slate-700/50;
+  }
+
+  .tab-btn-active {
+    @apply bg-purple-100 text-purple-700 border border-purple-300;
+  }
+
+  .tab-btn-inactive {
+    @apply text-gray-500 hover:text-gray-800 border border-transparent;
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(163, 53, 252, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(6, 182, 212, 0.5); }
+}
+
+.glow-animate {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
