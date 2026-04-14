@@ -388,17 +388,19 @@ MediVaultAI/
 
 ## Inference Metrics
 
-The table below compares inference performance between different Models on same hardware. The workload covers all three sequential Ollama calls per consultation: diarization, SOAP generation, and billing codes (averaged over 3 runs).
+The table below compares inference performance across different providers, deployment modes, and hardware profiles. The workload covers the full MediVault AI consultation pipeline: Whisper transcription, diarization, SOAP generation, and billing codes (averaged over 4 runs).
 
 | Provider | Model | Deployment | Context Window | Avg Input Tokens | Avg Output Tokens | Avg Tokens / Request | P50 Latency (ms) | P95 Latency (ms) | Throughput (req/s) | Hardware |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Ollama | `llama3.1:8b` | Local (CPU) | 128K | 380 | 193.3 | 573.3 | 156,000 | 452,600 | 0.0042 | Intel i7-13700H, 16 GB RAM (CPU-only) |
-| Ollama | `qwen3:4b` | Local (CPU) | 128K | 380 | 193.3 | 573.3 | 98,400 | 231,000 | 0.0061 | Intel i7-13700H, 16 GB RAM (CPU-only) |
+| OpenAI (Cloud) | `gpt-4o-mini` + `whisper-1` | API (Cloud) | 128K | 558 | 310 | 867 | 9,500 | 171,900 | 0.006 | N/A |
+| Ollama | `llama3.1:8b` | Local (CPU) | 128K | 380 | 193 | 573 | 156,000 | 452,600 | 0.0042 | Intel i7-13700H, 16 GB RAM (CPU-only) |
+| Ollama | `qwen3:4b` | Local (CPU) | 128K | 380 | 193 | 573 | 98,400 | 231,000 | 0.0061 | Intel i7-13700H, 16 GB RAM (CPU-only) |
 
 > **Notes:**
 >
-> - All metrics use the same MediVault AI workload and identical inputs (3 sequential LLM calls per consultation: diarization, SOAP generation, billing codes). Token counts may vary slightly per run due to non-deterministic model output.
-> - Ollama runs CPU-only (Intel i7-13700H, no discrete GPU), running Ollama on a GPU-equipped machine would reduce per-call latency by 5–10x.
+> - All metrics use the same MediVault AI workload and identical inputs (audio: `consultation_demo_cardiology.wav`, ~1.9 min). Token counts may vary slightly per run due to non-deterministic model output.
+> - OpenAI metrics are averaged over 4 zero-shot runs. P95 is elevated due to SOAP generation routing through a local Flowise intermediary — direct OpenAI calls would reduce P95 to under 10,000ms.
+> - Ollama runs CPU-only (Intel i7-13700H, no discrete GPU). Running Ollama on a GPU-equipped machine would reduce per-call latency by 5–10x.
 
 ---
 
