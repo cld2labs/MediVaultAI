@@ -34,8 +34,9 @@ A fully offline clinical intelligence platform that captures doctor-patient cons
   - [Usage Guide](#usage-guide)
   - [Inference Metrics](#inference-metrics)
   - [Model Capabilities](#model-capabilities)
-    - [Qwen3-4B](#qwen3-4b)
-    - [Llama 3.1 8B](#llama-31-8b)
+    - [Meta-Llama-3.1-8B-Instruct](#meta-llama-31-8b-instruct)
+    - [BAAI/bge-base-en-v1.5](#baaibge-base-en-v15)
+    - [GPT-4o-mini](#gpt-4o-mini)
     - [Comparison Summary](#comparison-summary)
   - [Flowise Orchestration](#flowise-orchestration)
   - [Environment Variables](#environment-variables)
@@ -388,71 +389,107 @@ MediVaultAI/
 
 ## Inference Metrics
 
-The table below compares inference performance between different Models on same hardware. The workload covers all three sequential Ollama calls per consultation: diarization, SOAP generation, and billing codes (averaged over 3 runs).
+The table below compares inference performance across different providers, deployment modes, and hardware profiles. The workload covers the full MediVault AI consultation pipeline: Whisper transcription, diarization, SOAP generation, and billing codes
 
 | Provider | Model | Deployment | Context Window | Avg Input Tokens | Avg Output Tokens | Avg Tokens / Request | P50 Latency (ms) | P95 Latency (ms) | Throughput (req/s) | Hardware |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Ollama | `llama3.1:8b` | Local (CPU) | 128K | 380 | 193.3 | 573.3 | 156,000 | 452,600 | 0.0042 | Intel i7-13700H, 16 GB RAM (CPU-only) |
-| Ollama | `qwen3:4b` | Local (CPU) | 128K | 380 | 193.3 | 573.3 | 98,400 | 231,000 | 0.0061 | Intel i7-13700H, 16 GB RAM (CPU-only) |
+| OpenAI (Cloud) | `gpt-4o-mini` + `whisper-1` | API (Cloud) | 128K | 558 | 310 | 867 | 9,500 | 171,900 | 0.006 | N/A |
+| [Intel OPEA EI](https://github.com/opea-project/Enterprise-Inference) | `meta-llama/Llama-3.1-8B-Instruct` + `BAAI/bge-base-en-v1.5` | Enterprise (On-Prem) | 128K | 588 | 372 | 960 | 68,463 | 156,099 | 0.0035 | CPU-only (Xeon) |
 
 > **Notes:**
 >
-> - All metrics use the same MediVault AI workload and identical inputs (3 sequential LLM calls per consultation: diarization, SOAP generation, billing codes). Token counts may vary slightly per run due to non-deterministic model output.
-> - Ollama runs CPU-only (Intel i7-13700H, no discrete GPU), running Ollama on a GPU-equipped machine would reduce per-call latency by 5–10x.
+> - All metrics use the same MediVault AI workload and identical inputs (audio~1.9 min). Token counts may vary slightly per run due to non-deterministic model output.
+> - OpenAI metrics are averaged over 5 zero-shot runs. P95 is elevated due to SOAP generation routing through a local Flowise intermediary
 
 ---
 
 ## Model Capabilities
 
-### Qwen3-4B
+### Meta-Llama-3.1-8B-Instruct
 
-A 4-billion-parameter open-weight model from Alibaba's Qwen team, well-suited for structured output generation and clinical text tasks at low hardware cost.
+An 8-billion-parameter open-weight instruction-tuned model from Meta (July 2023 release), designed for on-prem and enterprise deployment.
 
-| Attribute | Details |
-|---|---|
-| **Parameters** | 4.0B total |
-| **Architecture** | Transformer with Grouped Query Attention (GQA) |
-| **Context Window** | 128,000 tokens |
-| **Structured Output** | JSON-structured responses supported |
-| **Quantization Formats** | GGUF (Q4_K_M ~2.5 GB, Q8_0 ~4.3 GB) |
-| **Inference Runtimes** | Ollama, llama.cpp, LMStudio |
-| **License** | Apache 2.0 |
-| **Deployment** | Local, on-prem, air-gapped — full data sovereignty |
-| **tok/s on i7-13700H** | ~15–17 tok/s (CPU, Q4_K_M) |
 
-### Llama 3.1 8B
+| Attribute                   | Details                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Parameters**              | 8.0B total                                                                                        |
+| **Architecture**            | Transformer with Grouped Query Attention (GQA) — 32 layers, 32 Q-heads / 8 KV-heads              |
+| **Context Window**          | 128,000 tokens (128K) native                                                                      |
+| **Reasoning Mode**          | Standard instruction-following                                                                    |
+| **Tool / Function Calling** | Supported via structured prompts                                                                  |
+| **Structured Output**       | JSON-structured responses supported                                                               |
+| **Multilingual**            | English-focused with multilingual capabilities                                                    |
+| **Benchmarks**              | MMLU: 73.0%, GSM8K: 84.4%, HumanEval: 72.6%                                                       |
+| **Quantization Formats**    | GGUF (Q4_K_M ~4.9 GB, Q8_0 ~8.5 GB), AWQ (int4), GPTQ (int4)                                     |
+| **Inference Runtimes**      | Ollama, vLLM, llama.cpp, LMStudio, TGI                                                            |
+| **Fine-Tuning**             | Full fine-tuning and adapter-based (LoRA); community adapters available                            |
+| **License**                 | Llama 3.1 Community License (permits commercial use with conditions)                               |
+| **Deployment**              | Local, on-prem, air-gapped, cloud — full data sovereignty                                          |
 
-An 8-billion-parameter open-weight model from Meta, strong on instruction following, clinical question answering, and SOAP generation quality.
 
-| Attribute | Details |
-|---|---|
-| **Parameters** | 8.0B total |
-| **Architecture** | Transformer with Grouped Query Attention (GQA) |
-| **Context Window** | 128,000 tokens |
-| **Structured Output** | JSON-structured responses supported |
-| **Quantization Formats** | GGUF (Q4_K_M ~4.9 GB, Q8_0 ~8.5 GB) |
-| **Inference Runtimes** | Ollama, llama.cpp, vLLM, LMStudio |
-| **License** | Llama 3.1 Community License |
-| **Deployment** | Local, on-prem, air-gapped — full data sovereignty |
-| **tok/s on i7-13700H** | ~9–10 tok/s (CPU, Q4_K_M) |
+### BAAI/bge-base-en-v1.5
+
+A 109M-parameter English text embedding model from the Beijing Academy of Artificial Intelligence (BAAI), optimised for dense retrieval and semantic similarity tasks.
+
+
+| Attribute                   | Details                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Parameters**              | 109M total                                                                                        |
+| **Architecture**            | BERT-based bi-encoder                                                                             |
+| **Embedding Dimension**     | 768                                                                                               |
+| **Max Sequence Length**     | 512 tokens                                                                                        |
+| **Task**                    | Dense retrieval / semantic similarity                                                             |
+| **Benchmarks**              | MTEB (English) avg: 63.55                                                                         |
+| **Quantization Formats**    | FP32, FP16, INT8 (ONNX)                                                                           |
+| **Inference Runtimes**      | vLLM, Hugging Face Transformers, ONNX Runtime                                                     |
+| **Fine-Tuning**             | Full fine-tuning and adapter-based (LoRA)                                                         |
+| **License**                 | MIT                                                                                               |
+| **Deployment**              | Local, on-prem, air-gapped — full data sovereignty                                                |
+
+
+### GPT-4o-mini
+
+OpenAI's cost-efficient multimodal model, accessible exclusively via cloud API.
+
+
+| Attribute                   | Details                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------- |
+| **Parameters**              | Not publicly disclosed                                                            |
+| **Architecture**            | Multimodal Transformer (text + image input, text output)                          |
+| **Context Window**          | 128,000 tokens input / 16,384 tokens max output                                   |
+| **Reasoning Mode**          | Standard inference (no explicit chain-of-thought toggle)                          |
+| **Tool / Function Calling** | Supported; parallel function calling                                              |
+| **Structured Output**       | JSON mode and strict JSON schema adherence supported                              |
+| **Multilingual**            | Broad multilingual support                                                        |
+| **Benchmarks**              | MMLU: ~87%, strong HumanEval and MBPP scores                                      |
+| **Pricing**                 | $0.15 / 1M input tokens, $0.60 / 1M output tokens (Batch API: 50% discount)       |
+| **Fine-Tuning**             | Supervised fine-tuning via OpenAI API                                             |
+| **License**                 | Proprietary (OpenAI Terms of Use)                                                 |
+| **Deployment**              | Cloud-only — OpenAI API or Azure OpenAI Service. No self-hosted or on-prem option |
+| **Knowledge Cutoff**        | October 2023                                                                      |
+
 
 ### Comparison Summary
 
-| Capability | Qwen3-4B | Llama 3.1 8B |
-|---|---|---|
-| SOAP note generation | Yes | Yes |
-| Billing code extraction (ICD-10 / CPT) | Yes | Yes |
-| Speaker diarization classification | Yes | Yes |
-| Clinical QA with RAG | Yes | Yes |
-| On-prem / air-gapped deployment | Yes | Yes |
-| Data sovereignty | Full (weights run locally) | Full (weights run locally) |
-| Open weights | Yes (Apache 2.0) | Yes (Community License) |
-| Context window | 128K | 128K |
-| RAM required (Q4_K_M) | ~4 GB | ~6 GB |
-| Speed on CPU (i7-13700H) | ~15–17 tok/s | ~9–10 tok/s |
-| Output quality | Good — fast iteration | Better — recommended for production |
 
-> `qwen3:4b` is recommended when response speed is the priority or RAM is constrained. `llama3.1:8b` produces higher-quality SOAP notes and more accurate billing code suggestions and is the default model for this stack.
+| Capability                      | Meta-Llama-3.1-8B-Instruct       | GPT-4o-mini                       |
+| ------------------------------- | -------------------------------- | --------------------------------- |
+| SOAP note generation            | Yes                              | Yes                               |
+| Billing code extraction (ICD-10 / CPT) | Yes                       | Yes                               |
+| Speaker diarization classification | Yes                           | Yes                               |
+| Clinical QA with RAG            | Yes                              | Yes                               |
+| Function / tool calling         | Yes                              | Yes                               |
+| JSON structured output          | Yes                              | Yes                               |
+| On-prem / air-gapped deployment | Yes                              | No                                |
+| Data sovereignty                | Full (weights run locally)       | No (data sent to cloud API)       |
+| Open weights                    | Yes (Llama 3.1 Community License)| No (proprietary)                  |
+| Custom fine-tuning              | Full fine-tuning + LoRA adapters | Supervised fine-tuning (API only) |
+| Quantization for edge devices   | GGUF / AWQ / GPTQ                | N/A                               |
+| Multimodal (image input)        | No                               | Yes                               |
+| Native context window           | 128K                             | 128K                              |
+
+
+> Both models support SOAP generation, billing codes, and clinical QA with RAG. However, only Meta-Llama-3.1-8B-Instruct offers open weights, data sovereignty, and local deployment flexibility — making it suitable for air-gapped, regulated, or cost-sensitive clinical environments. GPT-4o-mini offers lower latency and higher throughput via OpenAI's cloud infrastructure, with added multimodal capabilities.
 
 ---
 
